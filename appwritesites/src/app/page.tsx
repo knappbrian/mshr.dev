@@ -65,7 +65,7 @@ export default function Home() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${jwt}`,
+          "x-appwrite-jwt": jwt,
         },
         body: JSON.stringify({
           url,
