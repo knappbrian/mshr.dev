@@ -70,6 +70,9 @@ const databaseId = process.env.APPWRITE_DATABASE_ID;
 const collectionId = process.env.APPWRITE_COLLECTION_ID;
 const apiKey = process.env.APPWRITE_API_KEY;
 
+console.log(`[Config] Endpoint: ${endpoint}`);
+console.log(`[Config] Project: ${projectId}`);
+
 // Admin Client
 const adminClient = new Client()
     .setEndpoint(endpoint)
@@ -136,7 +139,8 @@ async function validateAppwriteJWT(req, res, next) {
         req.user = session;
         next();
     } catch (error) {
-        return res.status(401).json({ error: 'Invalid or expired JWT' });
+        console.error('[Auth Error] JWT validation failed:', error.message);
+        return res.status(401).json({ error: `Auth failed: ${error.message}` });
     }
 }
 
