@@ -10,8 +10,32 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // --- Security & Middleware ---
+// Trust the proxy (Cloudflare, Nginx, etc.) to get correct IP for rate limiting
+app.set('trust proxy', 1); 
+
 app.use(express.json());
-app.use(cors({ origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*' }));
+
+// Robust CORS configuration
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+    ? process.env.ALLOWED_ORIGINS.split(',') 
+    : ['https://mshr.dev', 'https://l.mshr.dev', 'http://localhost:3000'];
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) === -1) {
+            return callback(new Error('CORS blocked'), false);
+        }
+        return callback(null, true);
+    },
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'x-appwrite-jwt', 'Authorization'],
+    credentials: true
+}));
+
+// Fix for PathError: Use (.*) instead of * for global wildcard preflight
+app.options('(.*)', cors());
+
 app.use(helmet());
 
 // Rate limiting to prevent API abuse
@@ -115,9 +139,9 @@ async function validateAppwriteJWT(req, res, next) {
 
 // --- Routes ---
 
-// Root Redirect: Redirect mshr.dev/ to app.mshr.dev/
+// Root Redirect: Redirect l.mshr.dev/ to mshr.dev/
 app.get('/', (req, res) => {
-    res.redirect(302, 'https://app.mshr.dev');
+    res.redirect(302, 'https://mshr.dev');
 });
 
 // POST /api/shorten
@@ -146,7 +170,7 @@ app.post('/api/shorten', apiLimiter, validateAppwriteJWT, async (req, res) => {
             if (match) {
                 return res.json({
                     shortCode: match.shortCode,
-                    shortUrl: `https://mshr.dev/${match.shortCode}`,
+                    shortUrl: `https://l.mshr.dev/${match.shortCode}`,
                     expiresAt: match.expiresAt,
                     isNew: false
                 });
@@ -169,7 +193,7 @@ app.post('/api/shorten', apiLimiter, validateAppwriteJWT, async (req, res) => {
 
         res.status(201).json({
             shortCode: newDoc.shortCode,
-            shortUrl: `https://mshr.dev/${newDoc.shortCode}`,
+            shortUrl: `https://l.mshr.dev/${newDoc.shortCode}`,
             expiresAt: newDoc.expiresAt,
             isNew: true
         });
@@ -186,7 +210,7 @@ app.get('/:shortCode', async (req, res) => {
 
     if (shortCode === 'favicon.ico') return res.status(404).end();
     
-    // Quick validation of shortCode format to avoid DB spam
+    // Quick validation of shortCode format
     if (!/^[A-Za-z0-9]{6}$/.test(shortCode)) {
         return res.status(404).send('<!DOCTYPE html><html><body><h1>404 Not Found</h1></body></html>');
     }
@@ -245,5 +269,5 @@ setInterval(async () => {
 }, 60 * 60 * 1000);
 
 app.listen(port, () => {
-    console.log(`mshr.dev oracle server listening on port ${port}`);
+    console.log(`mshr.dev oracle server (l.mshr.dev) listening on port ${port}`);
 });
