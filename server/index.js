@@ -34,7 +34,7 @@ app.use(cors({
 }));
 
 // Fix for PathError: Use (.*) instead of * for global wildcard preflight
-app.options('(.*)', cors());
+app.options(/.*/, cors());
 
 app.use(helmet());
 

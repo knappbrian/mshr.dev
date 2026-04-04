@@ -47,6 +47,11 @@ export default function Home() {
       return;
     }
 
+    let processedUrl = url.trim();
+    if (!/^https?:\/\//i.test(processedUrl)) {
+      processedUrl = `https://${processedUrl}`;
+    }
+
     try {
       setLoading(true);
       
@@ -65,7 +70,7 @@ export default function Home() {
           "Content-Type": "application/json",
           "x-appwrite-jwt": jwt,
         },
-        body: JSON.stringify({ url, expiry, honeypot }),
+        body: JSON.stringify({ url: processedUrl, expiry, honeypot }),
       });
 
       if (!response.ok) throw new Error("Failed to shorten link.");
@@ -132,7 +137,7 @@ export default function Home() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8">
         <div className="w-full max-w-md animate-fade-in-up">
-          <div className="mb-10 text-center sm:text-left border-l-4 border-[#22c55e] pl-6">
+          <div className="mb-10 text-center sm:text-left sm:border-l-4 border-l-0 border-[#22c55e] sm:pl-6 pl-0">
             <h1 className="text-4xl font-extrabold tracking-tight mb-2 text-[#22c55e]">mshr.dev</h1>
             <p className="opacity-70 text-sm font-medium uppercase tracking-widest">Link Shortener Service</p>
           </div>
@@ -159,7 +164,7 @@ export default function Home() {
                   </div>
                   <input
                     id="url"
-                    type="url"
+                    type="text"
                     placeholder="https://example.com/long/link"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
