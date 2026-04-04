@@ -20,23 +20,26 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',') 
     : ['https://mshr.dev', 'https://l.mshr.dev', 'http://localhost:3000'];
 
-app.use(cors({
+const corsOptions = {
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
         if (allowedOrigins.indexOf(origin) === -1) {
-            return callback(new Error('CORS blocked'), false);
+            return callback(null, false); // Blocked
         }
         return callback(null, true);
     },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'x-appwrite-jwt', 'Authorization'],
-    credentials: true
+    credentials: true,
+    optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+app.use(helmet({
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" }
 }));
-
-// Fix for PathError: Use (.*) instead of * for global wildcard preflight
-app.options(/.*/, cors());
-
-app.use(helmet());
 
 // Rate limiting to prevent API abuse
 const apiLimiter = rateLimit({

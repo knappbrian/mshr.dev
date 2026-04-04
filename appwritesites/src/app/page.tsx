@@ -55,14 +55,25 @@ export default function Home() {
     try {
       setLoading(true);
       
-      let jwtData;
+      let jwt = "";
       try {
-        jwtData = await account.createJWT();
+        // Try to get JWT first
+        const jwtData = await account.createJWT();
+        jwt = jwtData.jwt;
       } catch (err: any) {
-        await account.createAnonymousSession();
-        jwtData = await account.createJWT();
+        // If it fails, try to create an anonymous session
+        try {
+          await account.createAnonymousSession();
+          const jwtData = await account.createJWT();
+          jwt = jwtData.jwt;
+        } catch (sessionErr: any) {
+          // If session already exists or other error, try JWT one last time
+          const jwtData = await account.createJWT();
+          jwt = jwtData.jwt;
+        }
       }
-      const jwt = jwtData.jwt;
+
+      if (!jwt) throw new Error("Could not generate secure token.");
 
       const response = await fetch("https://l.mshr.dev/api/shorten", {
         method: "POST",
@@ -73,17 +84,21 @@ export default function Home() {
         body: JSON.stringify({ url: processedUrl, expiry, honeypot }),
       });
 
-      if (!response.ok) throw new Error("Failed to shorten link.");
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Failed to shorten link.");
+      }
 
       const data = await response.json();
       const expiryLabels: Record<string, string> = { "30m": "30m", "2h": "2h", "24h": "24h", "1w": "1w" };
       
       setResult({
-        shortUrl: `l.mshr.dev/${data.code}`,
+        shortUrl: `l.mshr.dev/${data.shortCode}`,
         expiryLabel: expiry !== "never" ? expiryLabels[expiry] : "",
       });
       
     } catch (err: any) {
+      console.error("Link shortening error:", err);
       setError(err.message || "Something went wrong.");
     } finally {
       setLoading(false);
