@@ -35,7 +35,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
 app.use(helmet({
     referrerPolicy: { policy: "strict-origin-when-cross-origin" }
