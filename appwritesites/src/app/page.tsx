@@ -30,21 +30,6 @@ export default function Home() {
 
   useEffect(() => {
     setMountTime(Date.now());
-    
-    const initAuth = async () => {
-      try {
-        await account.get();
-      } catch (e: any) {
-        if (e.code === 401) {
-          try {
-            await account.createAnonymousSession();
-          } catch (sessionErr) {
-            console.error("Failed to create anonymous session", sessionErr);
-          }
-        }
-      }
-    };
-    initAuth();
   }, []);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -64,7 +49,15 @@ export default function Home() {
 
     try {
       setLoading(true);
-      const jwtData = await account.createJWT();
+      
+      let jwtData;
+      try {
+        jwtData = await account.createJWT();
+      } catch (err: any) {
+        // No active session exists, create an anonymous one first
+        await account.createAnonymousSession();
+        jwtData = await account.createJWT();
+      }
       const jwt = jwtData.jwt;
 
       const response = await fetch("https://mshr.dev/api/shorten", {
