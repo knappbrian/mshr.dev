@@ -236,7 +236,7 @@ export default function Home() {
             {result && (
               <div className="mt-10 pt-8 border-t border-[#d0d7de] dark:border-[#30363d] animate-fade-in-up" style={{ animationDuration: '0.3s' }}>
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#22c55e]">Success</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#22c55e]">Shortened Link</span>
                   {result.expiryLabel && (
                     <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20">
                       Exp: {result.expiryLabel}
@@ -244,16 +244,28 @@ export default function Home() {
                   )}
                 </div>
                 
-                <div className="flex items-center justify-between border border-[#d0d7de] dark:border-[#30363d] rounded-md p-1.5 pl-4 bg-[#f6f8fa] dark:bg-[#0d1117] transition-all hover:border-[#22c55e]/50 group/result">
+                <div 
+                  onClick={copyToClipboard}
+                  className="flex items-center justify-between border border-[#d0d7de] dark:border-[#30363d] rounded-md p-1.5 pl-4 bg-[#f6f8fa] dark:bg-[#0d1117] transition-all hover:border-[#22c55e]/50 group/result cursor-pointer active:scale-[0.99] shadow-sm"
+                >
                   <span className="font-mono text-sm truncate pr-2 select-all font-bold text-[#22c55e]">
                     {result.shortUrl}
                   </span>
                   <button
-                    onClick={copyToClipboard}
-                    className="flex items-center justify-center p-2.5 bg-white dark:bg-[#161b22] border border-[#d0d7de] dark:border-[#30363d] hover:bg-neutral-50 dark:hover:bg-neutral-800 active:scale-90 rounded transition-all text-[#22c55e] shadow-sm"
+                    className="flex items-center gap-2 px-3 py-2 bg-[#22c55e] text-white hover:bg-[#1eb355] rounded-md transition-all text-[10px] font-bold uppercase tracking-widest"
                     aria-label="Copy to clipboard"
                   >
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copy</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
