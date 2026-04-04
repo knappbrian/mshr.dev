@@ -19,24 +19,24 @@
 
 @layer base {
   :root {
-    --bg: #fdfcfb;
-    --fg: #2c3e50;
-    --brand: #4a6741; /* Muted olive green */
-    --brand-hover: #3a5234;
+    --bg: #ffffff;
+    --fg: #1a1c1e;
+    --brand: #22c55e; /* Vibrant green */
+    --brand-hover: #16a34a;
     --border: #e1e4e8;
   }
   
   .dark {
-    --bg: #1a1c1e; /* Soft off-black */
-    --fg: #d1d5db;
-    --brand: #6a8c60; /* Muted sage green */
-    --brand-hover: #7ba670;
-    --border: #2d3139;
+    --bg: #0d1117; /* Deep midnight */
+    --fg: #f0f6fc;
+    --brand: #22c55e; /* Vibrant green */
+    --brand-hover: #4ade80;
+    --border: #30363d;
   }
   
   body {
     background-color: var(--bg);
     color: var(--fg);
-    transition: background-color 0.4s ease, color 0.4s ease;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
