@@ -4,22 +4,46 @@ const { Client, Databases, Query, ID, Account } = require('node-appwrite');
 const crypto = require('crypto');
 const cors = require('cors');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+// --- Security & Middleware ---
 app.use(express.json());
-app.use(cors());
-app.use(helmet()); // Basic security headers to prevent common attacks
+app.use(cors({ origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*' }));
+app.use(helmet());
 
-// --- Appwrite Configuration ---
+// Rate limiting to prevent API abuse
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
+});
+
+// --- Appwrite Configuration Validation ---
+const requiredEnv = [
+    'APPWRITE_PROJECT_ID',
+    'APPWRITE_DATABASE_ID',
+    'APPWRITE_COLLECTION_ID',
+    'APPWRITE_API_KEY'
+];
+
+const missingEnv = requiredEnv.filter(env => !process.env[env]);
+if (missingEnv.length > 0) {
+    console.error(`[Error] Missing required environment variables: ${missingEnv.join(', ')}`);
+    process.exit(1);
+}
+
 const endpoint = process.env.APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
 const projectId = process.env.APPWRITE_PROJECT_ID;
 const databaseId = process.env.APPWRITE_DATABASE_ID;
 const collectionId = process.env.APPWRITE_COLLECTION_ID;
-const apiKey = process.env.APPWRITE_API_KEY; // Requires Database API key
+const apiKey = process.env.APPWRITE_API_KEY;
 
-// Admin Client (for elevated operations: DB reads, writes, and cleanups)
+// Admin Client
 const adminClient = new Client()
     .setEndpoint(endpoint)
     .setProject(projectId)
@@ -28,7 +52,6 @@ const adminDatabases = new Databases(adminClient);
 
 // --- Helpers ---
 
-// Generate a random short code
 function generateShortCode(length = 6) {
     const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let result = '';
@@ -38,7 +61,6 @@ function generateShortCode(length = 6) {
     return result;
 }
 
-// Calculate the expiration timestamp
 function calculateExpiry(expiryString) {
     if (!expiryString || expiryString === 'never') return null;
     
@@ -49,29 +71,18 @@ function calculateExpiry(expiryString) {
     if (isNaN(value)) return null;
 
     switch (unit) {
-        case 'm':
-            now.setMinutes(now.getMinutes() + value);
-            break;
-        case 'h':
-            now.setHours(now.getHours() + value);
-            break;
-        case 'd':
-            now.setDate(now.getDate() + value);
-            break;
-        case 'w':
-            now.setDate(now.getDate() + value * 7);
-            break;
-        default:
-            return null; // Invalid unit defaults to no expiry
+        case 'm': now.setMinutes(now.getMinutes() + value); break;
+        case 'h': now.setHours(now.getHours() + value); break;
+        case 'd': now.setDate(now.getDate() + value); break;
+        case 'w': now.setDate(now.getDate() + value * 7); break;
+        default: return null;
     }
     return now.toISOString();
 }
 
-// URL validation & sanitization helper
 function isValidUrl(string) {
     try {
         const url = new URL(string);
-        // Only allow HTTP/HTTPS, preventing javascript:, data: attacks etc.
         return url.protocol === "http:" || url.protocol === "https:";
     } catch (_) {
         return false;
@@ -80,12 +91,9 @@ function isValidUrl(string) {
 
 // --- Middlewares ---
 
-// Validate Appwrite JWT to ensure a valid (anonymous) session
 async function validateAppwriteJWT(req, res, next) {
     const jwt = req.headers['x-appwrite-jwt'];
-    if (!jwt) {
-        return res.status(401).json({ error: 'Missing X-Appwrite-JWT header' });
-    }
+    if (!jwt) return res.status(401).json({ error: 'Missing X-Appwrite-JWT header' });
 
     try {
         const userClient = new Client()
@@ -96,11 +104,8 @@ async function validateAppwriteJWT(req, res, next) {
         const account = new Account(userClient);
         const session = await account.get();
         
-        if (!session) {
-            return res.status(401).json({ error: 'Invalid session' });
-        }
+        if (!session) return res.status(401).json({ error: 'Invalid session' });
         
-        // Attach user info to request
         req.user = session;
         next();
     } catch (error) {
@@ -110,46 +115,31 @@ async function validateAppwriteJWT(req, res, next) {
 
 // --- Routes ---
 
+// Root Redirect: Redirect mshr.dev/ to app.mshr.dev/
+app.get('/', (req, res) => {
+    res.redirect(302, 'https://app.mshr.dev');
+});
+
 // POST /api/shorten
-// Requires JWT header. Body: { url, expiry, honeypot }
-app.post('/api/shorten', validateAppwriteJWT, async (req, res) => {
+app.post('/api/shorten', apiLimiter, validateAppwriteJWT, async (req, res) => {
     const { url, expiry, honeypot } = req.body;
 
-    // Bot Protection: Honeypot check
-    // If the hidden 'honeypot' field is populated, silently reject the bot
-    if (honeypot) {
-        return res.status(400).json({ error: 'Invalid request' });
-    }
-
-    if (!url || !isValidUrl(url)) {
-        return res.status(400).json({ error: 'Invalid or unsafe URL provided' });
-    }
+    if (honeypot) return res.status(400).json({ error: 'Invalid request' });
+    if (!url || !isValidUrl(url)) return res.status(400).json({ error: 'Invalid or unsafe URL provided' });
 
     const expiresAt = calculateExpiry(expiry);
-    
-    // Hash URL for deduplication
     const urlHash = crypto.createHash('sha256').update(url).digest('hex');
 
     try {
-        // Deduplication Check
-        // Search for existing URL using the hash
         const existingDocs = await adminDatabases.listDocuments(
             databaseId,
             collectionId,
-            [
-                Query.equal('urlHash', urlHash)
-            ]
+            [Query.equal('urlHash', urlHash)]
         );
 
         if (existingDocs.documents.length > 0) {
-            // Check if there is a match with the same active status/expiry characteristics
             const match = existingDocs.documents.find(doc => {
-                // If the user wants no expiry, and we have an existing non-expiring link, use it
                 if (expiresAt === null && doc.expiresAt === null) return true;
-                
-                // For other expiries, if we find a valid (non-expired) link for the same URL, we can reuse it
-                // Note: If exact exact matching of '2h' is required vs '3h', this logic can be tightened.
-                // Here we return an active existing link to prevent DB bloat.
                 return doc.expiresAt && new Date(doc.expiresAt) > new Date();
             });
 
@@ -163,15 +153,13 @@ app.post('/api/shorten', validateAppwriteJWT, async (req, res) => {
             }
         }
 
-        // Create new short URL if no viable deduplicated link was found
         const shortCode = generateShortCode();
-        
         const newDoc = await adminDatabases.createDocument(
             databaseId,
             collectionId,
             ID.unique(),
             {
-                url: url, // Storing sanitized URL
+                url: url,
                 urlHash: urlHash,
                 shortCode: shortCode,
                 expiresAt: expiresAt,
@@ -193,37 +181,32 @@ app.post('/api/shorten', validateAppwriteJWT, async (req, res) => {
 });
 
 // GET /:shortCode
-// Redirects to original URL if valid and not expired
 app.get('/:shortCode', async (req, res) => {
     const { shortCode } = req.params;
 
-    // Prevent favicon.ico and typical static file requests from running DB queries
-    if (shortCode === 'favicon.ico') {
-        return res.status(404).end();
+    if (shortCode === 'favicon.ico') return res.status(404).end();
+    
+    // Quick validation of shortCode format to avoid DB spam
+    if (!/^[A-Za-z0-9]{6}$/.test(shortCode)) {
+        return res.status(404).send('<!DOCTYPE html><html><body><h1>404 Not Found</h1></body></html>');
     }
 
     try {
         const docs = await adminDatabases.listDocuments(
             databaseId,
             collectionId,
-            [
-                Query.equal('shortCode', shortCode),
-                Query.limit(1)
-            ]
+            [Query.equal('shortCode', shortCode), Query.limit(1)]
         );
 
         if (docs.documents.length === 0) {
-            return res.status(404).send('<!DOCTYPE html><html><body><h1>404 Not Found</h1><p>The requested shortlink was not found.</p></body></html>');
+            return res.status(404).send('<!DOCTYPE html><html><body><h1>404 Not Found</h1></body></html>');
         }
 
         const doc = docs.documents[0];
-
-        // Expiry check
         if (doc.expiresAt && new Date(doc.expiresAt) < new Date()) {
-            return res.status(410).send('<!DOCTYPE html><html><body><h1>410 Link Expired</h1><p>This short link has expired and is no longer available.</p></body></html>');
+            return res.status(410).send('<!DOCTYPE html><html><body><h1>410 Link Expired</h1></body></html>');
         }
 
-        // 301 Permanent Redirect for SEO and caching efficiency
         res.redirect(301, doc.url);
 
     } catch (error) {
@@ -233,9 +216,7 @@ app.get('/:shortCode', async (req, res) => {
 });
 
 // --- Cleanup Task ---
-// Runs every hour to permanently delete expired links from Appwrite
 setInterval(async () => {
-    console.log('[Cleanup Task] Running...');
     try {
         const now = new Date().toISOString();
         let hasMore = true;
@@ -246,11 +227,7 @@ setInterval(async () => {
             const expiredDocs = await adminDatabases.listDocuments(
                 databaseId,
                 collectionId,
-                [
-                    Query.lessThan('expiresAt', now),
-                    Query.limit(100),
-                    Query.offset(offset)
-                ]
+                [Query.lessThan('expiresAt', now), Query.limit(100), Query.offset(offset)]
             );
 
             for (const doc of expiredDocs.documents) {
@@ -258,19 +235,15 @@ setInterval(async () => {
                 deletedCount++;
             }
 
-            if (expiredDocs.documents.length < 100) {
-                hasMore = false;
-            } else {
-                offset += 100;
-            }
+            if (expiredDocs.documents.length < 100) hasMore = false;
+            else offset += 100;
         }
-        console.log(`[Cleanup Task] Completed. Deleted ${deletedCount} expired documents.`);
+        if (deletedCount > 0) console.log(`[Cleanup Task] Deleted ${deletedCount} expired documents.`);
     } catch (error) {
         console.error('[Cleanup Task] Error:', error);
     }
-}, 60 * 60 * 1000); // 1 hour in milliseconds
+}, 60 * 60 * 1000);
 
-// Start Server
 app.listen(port, () => {
-    console.log(`mshr.dev high-performance server listening on port ${port}`);
+    console.log(`mshr.dev oracle server listening on port ${port}`);
 });
