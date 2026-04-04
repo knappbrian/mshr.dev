@@ -124,10 +124,10 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md animate-fade-in-up">
           <div className="mb-10">
             <h1 className="text-3xl font-bold tracking-tight mb-2">mshr.dev</h1>
-            <p className="opacity-60 text-sm">Minimalist link management.</p>
+            <p className="opacity-60 text-sm">Link shortener.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -140,10 +140,10 @@ export default function Home() {
               tabIndex={-1} aria-hidden="true" autoComplete="off" 
             />
 
-            <div className="space-y-1.5">
-              <label htmlFor="url" className="text-xs font-semibold uppercase tracking-wider opacity-80">Destination URL</label>
+            <div className="space-y-1.5 group">
+              <label htmlFor="url" className="text-xs font-semibold uppercase tracking-wider opacity-80 group-focus-within:opacity-100 transition-opacity">Destination URL</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none opacity-50">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none opacity-50 group-focus-within:opacity-100 transition-opacity">
                   <LinkIcon className="h-4 w-4" />
                 </div>
                 <input
@@ -158,8 +158,8 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="expiry" className="text-xs font-semibold uppercase tracking-wider opacity-80">Expiration</label>
+            <div className="space-y-1.5 group">
+              <label htmlFor="expiry" className="text-xs font-semibold uppercase tracking-wider opacity-80 group-focus-within:opacity-100 transition-opacity">Expiration</label>
               <div className="relative">
                 <select
                   id="expiry"
@@ -173,14 +173,14 @@ export default function Home() {
                   <option value="24h" className="dark:bg-[#0a0a0a]">24 Hours</option>
                   <option value="1w" className="dark:bg-[#0a0a0a]">1 Week</option>
                 </select>
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none opacity-50">
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none opacity-50 group-focus-within:opacity-100 transition-opacity">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                 </div>
               </div>
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm mt-1 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-900/50">
+              <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm mt-1 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-900/50 animate-fade-in-up" style={{ animationDuration: '0.2s' }}>
                 <AlertCircle className="h-4 w-4" />
                 <span>{error}</span>
               </div>
@@ -189,7 +189,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 mt-4 bg-black text-white dark:bg-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
+              className="w-full py-2.5 mt-4 bg-black text-white dark:bg-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 font-medium rounded-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
             >
               {loading ? (
                 <>
@@ -203,7 +203,7 @@ export default function Home() {
           </form>
 
           {result && (
-            <div className="mt-8 pt-6 border-t border-black/10 dark:border-white/10">
+            <div className="mt-8 pt-6 border-t border-black/10 dark:border-white/10 animate-fade-in-up" style={{ animationDuration: '0.3s' }}>
               <div className="flex justify-between items-center mb-2">
                 <span className="text-xs font-semibold uppercase tracking-wider opacity-80">Your shortened link</span>
                 {result.expiryLabel && (
@@ -213,13 +213,13 @@ export default function Home() {
                 )}
               </div>
               
-              <div className="flex items-center justify-between border border-black/20 dark:border-white/20 rounded-md p-1 pl-3 bg-black/5 dark:bg-white/5">
+              <div className="flex items-center justify-between border border-black/20 dark:border-white/20 rounded-md p-1 pl-3 bg-black/5 dark:bg-white/5 transition-colors hover:border-black/40 dark:hover:border-white/40">
                 <span className="font-mono text-sm truncate pr-2 select-all font-medium">
                   {result.shortUrl}
                 </span>
                 <button
                   onClick={copyToClipboard}
-                  className="flex items-center justify-center p-2 bg-white dark:bg-[#0a0a0a] border border-black/20 dark:border-white/20 hover:bg-neutral-100 dark:hover:bg-neutral-900 rounded transition-colors"
+                  className="flex items-center justify-center p-2 bg-white dark:bg-[#0a0a0a] border border-black/20 dark:border-white/20 hover:bg-neutral-100 dark:hover:bg-neutral-900 active:scale-95 rounded transition-all"
                   aria-label="Copy to clipboard"
                 >
                   {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -229,10 +229,6 @@ export default function Home() {
           )}
         </div>
       </main>
-      
-      <footer className="p-6 text-center text-xs opacity-50 font-medium">
-        &copy; {new Date().getFullYear()} MeshCore. All rights reserved.
-      </footer>
     </div>
   );
 }
