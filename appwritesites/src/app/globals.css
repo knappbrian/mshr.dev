@@ -19,13 +19,13 @@
 
 @layer base {
   :root {
-    --bg: #ffffff;
-    --fg: #0a0a0a;
+    --bg: #f6f8fa;
+    --fg: #24292f;
   }
   
   .dark {
-    --bg: #0a0a0a;
-    --fg: #ededed;
+    --bg: #161b22;
+    --fg: #c9d1d9;
   }
   
   body {
