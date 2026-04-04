@@ -2,7 +2,7 @@
 
 import { useState, useEffect, FormEvent } from "react";
 import { account } from "@/lib/appwrite";
-import { Copy, Check, Loader2, Link as LinkIcon, AlertCircle } from "lucide-react";
+import { Copy, Check, Loader2, Link as LinkIcon, AlertCircle, Moon, Sun, ArrowLeft } from "lucide-react";
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -13,6 +13,20 @@ export default function Home() {
   const [result, setResult] = useState<{ shortUrl: string; expiryLabel: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [mountTime, setMountTime] = useState<number>(Date.now());
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    // Check initial preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setIsDark(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+    document.documentElement.classList.toggle('dark');
+  };
 
   useEffect(() => {
     setMountTime(Date.now());
@@ -38,14 +52,7 @@ export default function Home() {
     setError(null);
     setResult(null);
 
-    // Bot prevention 1: Honeypot
-    if (honeypot) {
-      setError("An error occurred during submission. Please try again.");
-      return;
-    }
-
-    // Bot prevention 2: Submission Timer (< 2 seconds)
-    if (Date.now() - mountTime < 2000) {
+    if (honeypot || Date.now() - mountTime < 2000) {
       setError("An error occurred during submission. Please try again.");
       return;
     }
@@ -57,7 +64,6 @@ export default function Home() {
 
     try {
       setLoading(true);
-      
       const jwtData = await account.createJWT();
       const jwt = jwtData.jwt;
 
@@ -67,26 +73,13 @@ export default function Home() {
           "Content-Type": "application/json",
           "x-appwrite-jwt": jwt,
         },
-        body: JSON.stringify({
-          url,
-          expiry,
-          honeypot,
-        }),
+        body: JSON.stringify({ url, expiry, honeypot }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to shorten link.");
-      }
+      if (!response.ok) throw new Error("Failed to shorten link.");
 
       const data = await response.json();
-      
-      // Determine expiry label for badge
-      const expiryLabels: Record<string, string> = {
-        "30m": "30 Minutes",
-        "2h": "2 Hours",
-        "24h": "24 Hours",
-        "1w": "1 Week",
-      };
+      const expiryLabels: Record<string, string> = { "30m": "30m", "2h": "2h", "24h": "24h", "1w": "1w" };
       
       setResult({
         shortUrl: `mshr.dev/${data.code}`,
@@ -108,71 +101,86 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-24 relative overflow-hidden">
-      <div className="z-10 w-full max-w-md">
-        <div className="text-center mb-10">
-          <h1 className="text-4xl font-extrabold tracking-tight mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
-            app.mshr.dev
-          </h1>
-          <p className="text-slate-400">Minimalist link management</p>
-        </div>
+    <div className="min-h-screen flex flex-col font-sans transition-colors duration-200">
+      {/* Header / Nav */}
+      <header className="flex justify-between items-center p-6 w-full max-w-5xl mx-auto">
+        <a 
+          href="https://bostonme.sh" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 text-sm font-medium hover:opacity-70 transition-opacity"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          bostonme.sh
+        </a>
+        <button 
+          onClick={toggleTheme} 
+          className="p-2 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+          aria-label="Toggle Theme"
+        >
+          {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </button>
+      </header>
 
-        <div className="glass-panel rounded-2xl p-6 sm:p-8 relative">
-          
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            {/* Honeypot field - completely invisible to humans but in DOM for bots */}
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8">
+        <div className="w-full max-w-md">
+          <div className="mb-10">
+            <h1 className="text-3xl font-bold tracking-tight mb-2">mshr.dev</h1>
+            <p className="opacity-60 text-sm">Minimalist link management.</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <input 
               type="text" 
               name="website_url_catch" 
               value={honeypot} 
               onChange={(e) => setHoneypot(e.target.value)} 
               className="opacity-0 absolute -z-10 w-0 h-0" 
-              tabIndex={-1} 
-              aria-hidden="true" 
-              autoComplete="off" 
+              tabIndex={-1} aria-hidden="true" autoComplete="off" 
             />
 
-            <div className="space-y-2">
-              <label htmlFor="url" className="text-sm font-medium text-slate-300 ml-1">Destination URL</label>
+            <div className="space-y-1.5">
+              <label htmlFor="url" className="text-xs font-semibold uppercase tracking-wider opacity-80">Destination URL</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <LinkIcon className="h-5 w-5" />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none opacity-50">
+                  <LinkIcon className="h-4 w-4" />
                 </div>
                 <input
                   id="url"
                   type="url"
-                  placeholder="https://example.com/very/long/link"
+                  placeholder="https://example.com/long/link"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-white placeholder:text-slate-500"
+                  className="w-full pl-9 pr-4 py-2.5 bg-transparent border border-black/20 dark:border-white/20 rounded-md focus:outline-none focus:border-black dark:focus:border-white transition-colors text-sm"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label htmlFor="expiry" className="text-sm font-medium text-slate-300 ml-1">Expiration</label>
+            <div className="space-y-1.5">
+              <label htmlFor="expiry" className="text-xs font-semibold uppercase tracking-wider opacity-80">Expiration</label>
               <div className="relative">
                 <select
                   id="expiry"
                   value={expiry}
                   onChange={(e) => setExpiry(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all text-white appearance-none cursor-pointer"
+                  className="w-full px-3 py-2.5 bg-transparent border border-black/20 dark:border-white/20 rounded-md focus:outline-none focus:border-black dark:focus:border-white transition-colors appearance-none cursor-pointer text-sm"
                 >
-                  <option value="never" className="bg-slate-900 text-white">Never</option>
-                  <option value="30m" className="bg-slate-900 text-white">30 Minutes</option>
-                  <option value="2h" className="bg-slate-900 text-white">2 Hours</option>
-                  <option value="24h" className="bg-slate-900 text-white">24 Hours</option>
-                  <option value="1w" className="bg-slate-900 text-white">1 Week</option>
+                  <option value="never" className="dark:bg-[#0a0a0a]">Never</option>
+                  <option value="30m" className="dark:bg-[#0a0a0a]">30 Minutes</option>
+                  <option value="2h" className="dark:bg-[#0a0a0a]">2 Hours</option>
+                  <option value="24h" className="dark:bg-[#0a0a0a]">24 Hours</option>
+                  <option value="1w" className="dark:bg-[#0a0a0a]">1 Week</option>
                 </select>
-                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none opacity-50">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
                 </div>
               </div>
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 text-red-400 text-sm p-3 bg-red-400/10 border border-red-400/20 rounded-xl">
+              <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-sm mt-1 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-200 dark:border-red-900/50">
                 <AlertCircle className="h-4 w-4" />
                 <span>{error}</span>
               </div>
@@ -181,11 +189,11 @@ export default function Home() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 mt-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-2.5 mt-4 bg-black text-white dark:bg-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-sm"
             >
               {loading ? (
                 <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Shortening...</span>
                 </>
               ) : (
@@ -195,37 +203,36 @@ export default function Home() {
           </form>
 
           {result && (
-            <div className="mt-8 pt-6 border-t border-white/10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-sm font-medium text-slate-300">Your shortened link:</span>
+            <div className="mt-8 pt-6 border-t border-black/10 dark:border-white/10">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider opacity-80">Your shortened link</span>
                 {result.expiryLabel && (
-                  <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    Expires in {result.expiryLabel}
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 opacity-80">
+                    Exp: {result.expiryLabel}
                   </span>
                 )}
               </div>
               
-              <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-xl p-2 relative group">
-                <div className="flex-1 px-3 py-2 text-blue-300 font-medium truncate select-all">
+              <div className="flex items-center justify-between border border-black/20 dark:border-white/20 rounded-md p-1 pl-3 bg-black/5 dark:bg-white/5">
+                <span className="font-mono text-sm truncate pr-2 select-all font-medium">
                   {result.shortUrl}
-                </div>
+                </span>
                 <button
                   onClick={copyToClipboard}
-                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all"
+                  className="flex items-center justify-center p-2 bg-white dark:bg-[#0a0a0a] border border-black/20 dark:border-white/20 hover:bg-neutral-100 dark:hover:bg-neutral-900 rounded transition-colors"
                   aria-label="Copy to clipboard"
                 >
-                  {copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
-                  <span className="text-sm font-medium">{copied ? "Copied" : "Copy"}</span>
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </button>
               </div>
             </div>
           )}
         </div>
-        
-        <div className="mt-8 text-center text-slate-500 text-sm">
-          <p>&copy; {new Date().getFullYear()} MeshCore. All rights reserved.</p>
-        </div>
-      </div>
-    </main>
+      </main>
+      
+      <footer className="p-6 text-center text-xs opacity-50 font-medium">
+        &copy; {new Date().getFullYear()} MeshCore. All rights reserved.
+      </footer>
+    </div>
   );
 }
