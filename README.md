@@ -30,3 +30,4 @@ Anti-bot measures such as requiring anonymous JWT Token and mimimum page time bu
 ## Deployment
 
 Ensure that all required environment variables are set in your production environment before deploying the backend and frontend services.
+Disclaimer: Built in part using AI.
