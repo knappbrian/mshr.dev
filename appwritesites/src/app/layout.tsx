@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "mshr.dev | Boston Mesh Link Shortener",
-  description: "Minimalist link management for the Greater Boston Mesh.",
+  description: "Link shortener service for LoRa devices and MeshCore.",
   icons: {
     icon: "/icon.svg",
   },
